@@ -168,47 +168,89 @@ def get_weather(lat, lon):
     return response.json()["current"]
 
 
+
 def fetch_forest_boundary(forest_name):
-    """Fetch a forest boundary from OpenStreetMap's Nominatim service."""
+    """Try multiple OpenStreetMap search names for a forest polygon."""
+
+    search_names = {
+        "Jim Corbett National Park": [
+            "Jim Corbett National Park, Uttarakhand, India",
+            "Corbett National Park, India",
+        ],
+        "Amrabad Tiger Reserve": [
+            "Amrabad Tiger Reserve, Telangana, India",
+            "Amrabad Wildlife Sanctuary, Telangana, India",
+        ],
+        "Nagarhole National Park": [
+            "Nagarhole National Park, Karnataka, India",
+            "Rajiv Gandhi National Park, Karnataka, India",
+        ],
+        "Kanha National Park": [
+            "Kanha National Park, Madhya Pradesh, India",
+            "Kanha Tiger Reserve, Madhya Pradesh, India",
+            "Kanha National Park, India",
+        ],
+        "Sundarbans National Park": [
+            "Sundarban National Park, West Bengal, India",
+            "Sundarbans National Park, West Bengal, India",
+            "Sundarbans National Park, India",
+        ],
+    }
+
+    queries = search_names.get(
+        forest_name,
+        [f"{forest_name}, India"],
+    )
 
     url = "https://nominatim.openstreetmap.org/search"
 
-    params = {
-        "q": f"{forest_name}, India",
-        "format": "jsonv2",
-        "polygon_geojson": 1,
-        "limit": 1,
-    }
-
     headers = {
-        "User-Agent": "FireGridNet/1.0 (student wildfire monitoring project)"
+        "User-Agent": "FireGridNet/1.0 (student wildfire research project)"
     }
 
-    try:
-        response = requests.get(
-            url,
-            params=params,
-            headers=headers,
-            timeout=20,
-        )
-        response.raise_for_status()
-        results = response.json()
+    for query in queries:
+        try:
+            response = requests.get(
+                url,
+                params={
+                    "q": query,
+                    "format": "jsonv2",
+                    "polygon_geojson": 1,
+                    "limit": 10,
+                    "countrycodes": "in",
+                },
+                headers=headers,
+                timeout=25,
+            )
 
-        if not results:
-            return None
+            response.raise_for_status()
+            results = response.json()
 
-        geometry = results[0].get("geojson")
+            # Check every returned result, not just the first one
+            for item in results:
+                geometry = item.get("geojson")
 
-        if not geometry or geometry.get("type") not in (
-            "Polygon",
-            "MultiPolygon",
+                if not isinstance(geometry, dict):
+                    continue
+
+                geometry_type = geometry.get("type")
+                coordinates = geometry.get("coordinates")
+
+                if (
+                    geometry_type in ("Polygon", "MultiPolygon")
+                    and coordinates
+                ):
+                    return geometry
+
+        except (
+            requests.RequestException,
+            ValueError,
+            TypeError,
         ):
-            return None
+            continue
 
-        return geometry
+    return None
 
-    except requests.RequestException:
-        return None
 
 
 # --------------------------------------------------
