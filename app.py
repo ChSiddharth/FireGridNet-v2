@@ -164,6 +164,58 @@ def get_weather(lat, lon):
 
     return response.json()["current"]
 
+def get_weather(lat, lon):
+    # Keep your existing get_weather function here
+    # Do not replace its code
+
+
+def fetch_forest_boundary(forest_name):
+    """Fetch a forest boundary from OpenStreetMap's Nominatim service."""
+    url = "https://nominatim.openstreetmap.org/search"
+
+    params = {
+        "q": f"{forest_name}, India",
+        "format": "jsonv2",
+        "polygon_geojson": 1,
+        "limit": 1,
+    }
+
+    headers = {
+        "User-Agent": "FireGridNet/1.0 (student wildfire monitoring project)"
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=20,
+        )
+        response.raise_for_status()
+        results = response.json()
+
+        if not results:
+            return None
+
+        geometry = results[0].get("geojson")
+
+        if not geometry or geometry.get("type") not in (
+            "Polygon",
+            "MultiPolygon",
+        ):
+            return None
+
+        return geometry
+
+    except requests.RequestException:
+        return None
+
+
+def inside_polygon(point, polygon):
+    # Keep your existing inside_polygon function here
+    # Do not replace its code
+
+
 
 # --------------------------------------------------
 # 7. CHECK WHETHER A POINT IS INSIDE A POLYGON
