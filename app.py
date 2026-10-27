@@ -395,6 +395,71 @@ if page == pages[0]:
 
 elif page == pages[1]:
     st.subheader("Forest Grid Generation")
+    
+st.subheader("🌲 Load Forest Boundary")
+
+boundary_file = st.file_uploader(
+    "Upload forest boundary (GeoJSON)",
+    type=["geojson", "json"],
+    key="forest_boundary_upload",
+)
+
+cell_size_km = st.number_input(
+    "Grid cell size (km)",
+    min_value=0.5,
+    max_value=10.0,
+    value=1.0,
+    step=0.5,
+)
+
+if boundary_file is not None:
+    try:
+        boundary_geojson = json.load(boundary_file)
+
+        if boundary_geojson.get("type") == "FeatureCollection":
+            features = boundary_geojson.get("features", [])
+
+            if len(features) != 1:
+                st.warning(
+                    "Please upload a GeoJSON containing one forest boundary."
+                )
+            else:
+                boundary_geojson = features[0]
+
+                if st.button("Generate Forest Grid", type="primary"):
+                    grid_data = generate_forest_grid(
+                        boundary_geojson,
+                        cell_size_km=cell_size_km,
+                    )
+
+                    st.session_state["generated_forest_grid"] = grid_data
+
+                    st.success(
+                        f"Generated {len(grid_data['features'])} grid cells."
+                    )
+
+        elif boundary_geojson.get("type") == "Feature":
+            if st.button("Generate Forest Grid", type="primary"):
+                grid_data = generate_forest_grid(
+                    boundary_geojson,
+                    cell_size_km=cell_size_km,
+                )
+
+                st.session_state["generated_forest_grid"] = grid_data
+
+                st.success(
+                    f"Generated {len(grid_data['features'])} grid cells."
+                )
+
+        else:
+            st.error(
+                "Upload a GeoJSON Feature or a FeatureCollection "
+                "containing one forest boundary."
+            )
+
+    except Exception as e:
+        st.error(f"Could not process boundary: {e}")
+
 
     selected = st.selectbox(
         "Forest",
