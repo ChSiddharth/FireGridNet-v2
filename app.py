@@ -70,11 +70,48 @@ page = st.sidebar.radio("WORKSPACE", pages)
 # --------------------------------------------------
 
 FORESTS = {
+    
+FORESTS = {
+    # Smaller parks
+    "Kasu Brahmananda Reddy National Park": (17.42, 78.41),
+    "Keoladeo National Park": (27.16, 77.52),
+    "Mrugavani National Park": (17.34, 78.34),
+    "Mahavir Harina Vanasthali National Park": (17.34, 78.57),
+    "Pambadum Shola National Park": (10.13, 77.19),
+    "Silent Valley National Park": (11.08, 76.43),
+    "Guindy National Park": (13.00, 80.23),
+    "Ranthambore National Park": (26.02, 76.50),
+    "Rajiv Gandhi National Park": (12.00, 76.10),
+
+    # Medium-sized parks
+    "Dachigam National Park": (34.13, 75.03),
+    "Bannerghatta National Park": (12.80, 77.58),
+    "Pench National Park": (21.68, 79.25),
+    "Bandhavgarh National Park": (23.70, 81.03),
+    "Panna National Park": (24.72, 80.18),
+    "Satpura National Park": (22.48, 78.43),
     "Jim Corbett National Park": (29.53, 78.77),
-    "Amrabad Tiger Reserve": (16.30, 78.60),
     "Nagarhole National Park": (12.00, 76.10),
-    "Kanha National Park": (22.33, 80.61),
-    "Sundarbans National Park": (21.95, 88.90),
+    "Bandipur National Park": (11.67, 76.63),
+    "Kaziranga National Park": (26.58, 93.17),
+    "Manas National Park": (26.72, 91.00),
+    "Great Himalayan National Park": (31.75, 77.53),
+    "Dudhwa National Park": (28.50, 80.65),
+    "Periyar National Park": (9.46, 77.24),
+    "Rajaji National Park": (30.02, 78.20),
+    "Kudremukh National Park": (13.23, 75.20),
+
+    # Larger parks and forest reserves
+    "Amrabad Tiger Reserve": (16.30, 78.60),
+    "Namdapha National Park": (27.50, 96.40),
+    "Papikonda National Park": (17.45, 81.30),
+    "Similipal National Park": (21.93, 86.35),
+    "Indravati National Park": (18.75, 80.50),
+    "Desert National Park": (26.85, 70.50),
+    "Gangotri National Park": (30.98, 79.10),
+    "Hemis National Park": (33.90, 77.60),
+}
+
 }
 
 
