@@ -335,60 +335,93 @@ def inside_polygon(lon, lat, ring):
 # 8. GENERATE FOREST GRID
 # --------------------------------------------------
 
+
+# --------------------------------------------------
+# 8. GENERATE FOREST GRID
+# --------------------------------------------------
+
 def generate_grid(center, boundary, rows, cols):
+    """Generate grid cells across the selected forest boundary."""
+
     lat, lon = center
+    rings = []
 
-    lat_span = 0.12
-    lon_span = lat_span / max(
-        math.cos(math.radians(lat)),
-        0.25,
-    )
-
-    min_lat = lat - lat_span / 2
-    min_lon = lon - lon_span / 2
-
-    ring = None
-
+    # Extract exterior boundary rings
     if boundary and boundary.get("type") == "Polygon":
-        ring = boundary["coordinates"][0]
+        rings = boundary.get("coordinates", [])[:1]
 
     elif boundary and boundary.get("type") == "MultiPolygon":
-        ring = boundary["coordinates"][0][0]
+        rings = [
+            polygon[0]
+            for polygon in boundary.get("coordinates", [])
+            if polygon
+        ]
+
+    # If no usable boundary exists, use an approximate study area
+    if not rings:
+        lat_span = 0.12
+        lon_span = lat_span / max(
+            math.cos(math.radians(lat)), 0.25
+        )
+
+        min_lat = lat - lat_span / 2
+        max_lat = lat + lat_span / 2
+        min_lon = lon - lon_span / 2
+        max_lon = lon + lon_span / 2
+
+    else:
+        all_points = [
+            point
+            for ring in rings
+            for point in ring
+        ]
+
+        min_lon = min(point[0] for point in all_points)
+        max_lon = max(point[0] for point in all_points)
+        min_lat = min(point[1] for point in all_points)
+        max_lat = max(point[1] for point in all_points)
+
+    # Prevent invalid grid dimensions
+    if min_lat >= max_lat or min_lon >= max_lon:
+        return pd.DataFrame()
+
+    cell_lat = (max_lat - min_lat) / rows
+    cell_lon = (max_lon - min_lon) / cols
 
     records = []
 
     for r in range(rows):
         for c in range(cols):
-            cell_lat = (
-                min_lat + (r + 0.5) * lat_span / rows
-            )
+            cell_lat_center = min_lat + (r + 0.5) * cell_lat
+            cell_lon_center = min_lon + (c + 0.5) * cell_lon
 
-            cell_lon = (
-                min_lon + (c + 0.5) * lon_span / cols
-            )
-
-            if ring and not inside_polygon(
-                cell_lon,
-                cell_lat,
-                ring,
+            # Keep cells whose centers are inside any boundary ring
+            if rings and not any(
+                inside_polygon(
+                    cell_lon_center,
+                    cell_lat_center,
+                    ring,
+                )
+                for ring in rings
             ):
                 continue
 
-            records.append(
-                {
-                    "Grid ID": f"{chr(65 + r)}{c + 1:02d}",
-                    "Latitude": round(cell_lat, 5),
-                    "Longitude": round(cell_lon, 5),
-                    "Temperature °C": None,
-                    "Humidity %": None,
-                    "Rain mm": None,
-                    "Wind km/h": None,
-                    "Risk Score": None,
-                    "Risk Level": "Not assessed",
-                }
-            )
+            records.append({
+                "Grid ID": f"{chr(65 + r)}{c + 1:02d}",
+                "Latitude": round(cell_lat_center, 6),
+                "Longitude": round(cell_lon_center, 6),
+                "Cell Height": cell_lat,
+                "Cell Width": cell_lon,
+                "Temperature °C": None,
+                "Humidity %": None,
+                "Rain mm": None,
+                "Wind km/h": None,
+                "Risk Score": None,
+                "Risk Level": "Not assessed",
+            })
 
     return pd.DataFrame(records)
+
 
 
 # --------------------------------------------------
@@ -460,20 +493,10 @@ def build_map(global_view=False, with_grid=False):
         ).add_to(m)
 
     # Draw grid cells
+    
+    # Draw grid cells using their actual generated dimensions
     if with_grid and not st.session_state.grid.empty:
         df = st.session_state.grid
-
-        rows = st.session_state.grid_rows
-        cols = st.session_state.grid_cols
-
-        lat_span = 0.12
-        lon_span = lat_span / max(
-            math.cos(math.radians(lat)),
-            0.25,
-        )
-
-        cell_lat = lat_span / rows
-        cell_lon = lon_span / cols
 
         for _, cell in df.iterrows():
             color = COLORS.get(
@@ -483,6 +506,8 @@ def build_map(global_view=False, with_grid=False):
 
             clat = cell["Latitude"]
             clon = cell["Longitude"]
+            cell_lat = cell["Cell Height"]
+            cell_lon = cell["Cell Width"]
 
             folium.Rectangle(
                 bounds=[
@@ -506,10 +531,6 @@ def build_map(global_view=False, with_grid=False):
                     f'{cell["Risk Score"]}'
                 ),
             ).add_to(m)
-
-    folium.LayerControl().add_to(m)
-
-    return m
 
 
 # --------------------------------------------------
