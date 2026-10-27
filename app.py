@@ -50,15 +50,15 @@ FORESTS = {
 }
 
 if "forest" not in st.session_state:
-st.session_state.forest = "Jim Corbett National Park"
+    st.session_state.forest = "Jim Corbett National Park"
 if "center" not in st.session_state:
-st.session_state.center = list(FORESTS[st.session_state.forest])
+    st.session_state.center = list(FORESTS[st.session_state.forest])
 if "boundary" not in st.session_state:
-st.session_state.boundary = None
+    st.session_state.boundary = None
 if "grid" not in st.session_state:
-st.session_state.grid = pd.DataFrame()
+    st.session_state.grid = pd.DataFrame()
 if "incidents" not in st.session_state:
-st.session_state.incidents = []
+    st.session_state.incidents = []
 
 def risk_score(temp, humidity, rain, wind):
 values = [temp, humidity, rain, wind]
