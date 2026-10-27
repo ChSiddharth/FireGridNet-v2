@@ -197,8 +197,7 @@ lat, lon = st.session_state.center
 m = folium.Map(
 location=[lat, lon],
 zoom_start=10,
-        tiles="CartoDB dark_matter",
-        tiles="OpenStreetMap",
+tiles="OpenStreetMap",
 control_scale=True,
 )
 
