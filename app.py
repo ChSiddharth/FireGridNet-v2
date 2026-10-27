@@ -428,6 +428,7 @@ def generate_grid(center, boundary, rows, cols):
 # 9. BUILD MAPS
 # --------------------------------------------------
 
+
 def build_map(global_view=False, with_grid=False):
 
     # World map
@@ -492,22 +493,81 @@ def build_map(global_view=False, with_grid=False):
             },
         ).add_to(m)
 
-    # Draw grid cells
-    
-    # Draw grid cells using their actual generated dimensions
-    if with_grid and not st.session_state.grid.empty:
-        df = st.session_state.grid
+    # Draw grid cells safely
+    grid = st.session_state.get("grid", pd.DataFrame())
 
-        for _, cell in df.iterrows():
-            color = COLORS.get(
-                cell["Risk Level"],
-                COLORS["Not assessed"],
+    required_columns = [
+        "Grid ID",
+        "Latitude",
+        "Longitude",
+        "Risk Level",
+        "Risk Score",
+    ]
+
+    if (
+        with_grid
+        and isinstance(grid, pd.DataFrame)
+        and not grid.empty
+        and all(col in grid.columns for col in required_columns)
+    ):
+
+        # Use actual dimensions when available
+        has_dimensions = (
+            "Cell Height" in grid.columns
+            and "Cell Width" in grid.columns
+        )
+
+        if has_dimensions:
+            cell_lat_default = None
+            cell_lon_default = None
+        else:
+            # Fallback for grids created by the older function
+            cell_lat_default = 0.12 / 10
+            cell_lon_default = (
+                cell_lat_default
+                / max(math.cos(math.radians(lat)), 0.25)
             )
+
+        for _, cell in grid.iterrows():
 
             clat = cell["Latitude"]
             clon = cell["Longitude"]
-            cell_lat = cell["Cell Height"]
-            cell_lon = cell["Cell Width"]
+
+            if pd.isna(clat) or pd.isna(clon):
+                continue
+
+            cell_lat = (
+                cell["Cell Height"]
+                if has_dimensions
+                else cell_lat_default
+            )
+            cell_lon = (
+                cell["Cell Width"]
+                if has_dimensions
+                else cell_lon_default
+            )
+
+            if (
+                pd.isna(cell_lat)
+                or pd.isna(cell_lon)
+                or cell_lat <= 0
+                or cell_lon <= 0
+            ):
+                continue
+
+            risk_level = cell["Risk Level"]
+
+            if pd.isna(risk_level):
+                risk_level = "Not assessed"
+
+            color = COLORS.get(
+                risk_level,
+                COLORS["Not assessed"],
+            )
+
+            risk_score = cell["Risk Score"]
+            if pd.isna(risk_score):
+                risk_score = "Not assessed"
 
             folium.Rectangle(
                 bounds=[
@@ -524,13 +584,18 @@ def build_map(global_view=False, with_grid=False):
                 weight=1,
                 fill=True,
                 fill_color=color,
-                fill_opacity=0.65,
+                fill_opacity=0.45,
                 tooltip=(
                     f'{cell["Grid ID"]} · '
-                    f'{cell["Risk Level"]} · '
-                    f'{cell["Risk Score"]}'
+                    f'{risk_level} · '
+                    f'{risk_score}'
                 ),
             ).add_to(m)
+
+    folium.LayerControl().add_to(m)
+
+    return m
+
 
 
 # --------------------------------------------------
