@@ -398,7 +398,6 @@ if page == pages[0]:
             key="world_map",
         )
 
-    
     with right:
         forest_names = list(FORESTS.keys())
 
@@ -409,7 +408,11 @@ if page == pages[0]:
             key="forest_selector",
         )
 
-        if st.button("Open forest", type="primary"):
+        if st.button(
+            "Open forest",
+            type="primary",
+            key="open_forest_button",
+        ):
             if selected != st.session_state.forest:
                 st.session_state.forest = selected
                 st.session_state.center = list(FORESTS[selected])
@@ -419,13 +422,6 @@ if page == pages[0]:
                 st.session_state.pop("grid_cols", None)
 
             st.success(f"Selected forest: {selected}")
-
-
-        if st.button("Open forest", type="primary", key="open_forest_button"):
-            st.session_state.forest = selected
-            st.session_state.center = list(FORESTS[selected])
-            st.session_state.boundary = None
-            st.session_state.grid = pd.DataFrame()
 
     st.markdown(
         f"**Selected:** {st.session_state.forest}"
@@ -474,9 +470,7 @@ if page == pages[0]:
     )
 
     if result and result.get("last_active_drawing"):
-        geometry = result["last_active_drawing"].get(
-            "geometry"
-        )
+        geometry = result["last_active_drawing"].get("geometry")
 
         if geometry and geometry.get("type") in (
             "Polygon",
