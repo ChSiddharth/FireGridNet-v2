@@ -398,11 +398,28 @@ if page == pages[0]:
             key="world_map",
         )
 
+    
     with right:
+        forest_names = list(FORESTS.keys())
+
         selected = st.selectbox(
             "Select an Indian forest",
-            list(FORESTS),
+            forest_names,
+            index=forest_names.index(st.session_state.forest),
+            key="forest_selector",
         )
+
+        if st.button("Open forest", type="primary"):
+            if selected != st.session_state.forest:
+                st.session_state.forest = selected
+                st.session_state.center = list(FORESTS[selected])
+                st.session_state.boundary = None
+                st.session_state.grid = pd.DataFrame()
+                st.session_state.pop("grid_rows", None)
+                st.session_state.pop("grid_cols", None)
+
+            st.success(f"Selected forest: {selected}")
+
 
         if st.button("Open forest", type="primary"):
             st.session_state.forest = selected
