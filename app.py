@@ -68,8 +68,6 @@ page = st.sidebar.radio("WORKSPACE", pages)
 # --------------------------------------------------
 # 3. FOREST LOCATIONS
 # --------------------------------------------------
-
-FORESTS = {
     
 FORESTS = {
     # Smaller parks
@@ -112,7 +110,6 @@ FORESTS = {
     "Hemis National Park": (33.90, 77.60),
 }
 
-}
 
 
 # --------------------------------------------------
