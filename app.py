@@ -426,6 +426,11 @@ def build_map(global_view=False, with_grid=False):
 # 10. MODULE 1: WORLD MAP & FOREST EXPLORER
 # --------------------------------------------------
 
+
+# --------------------------------------------------
+# 10. MODULE 1: WORLD MAP & FOREST EXPLORER
+# --------------------------------------------------
+
 if page == pages[0]:
 
     st.subheader("World Map & Forest Explorer")
@@ -477,21 +482,28 @@ if page == pages[0]:
         "Forest names are starting examples. Verify boundaries "
         "before using results for real-world decisions."
     )
+
     if st.button(
         "Fetch forest boundary",
         type="secondary",
         key="fetch_forest_boundary_button",
     ):
-        with st.spinner("Searching OpenStreetMap for the forest boundary..."):
-            geometry = fetch_forest_boundary(st.session_state.forest)
+        with st.spinner(
+            "Searching OpenStreetMap for the forest boundary..."
+        ):
+            geometry = fetch_forest_boundary(
+                st.session_state.forest
+            )
 
         if geometry:
             st.session_state.boundary = geometry
             st.success("Forest boundary fetched successfully!")
         else:
             st.warning(
-                "No boundary polygon was found. Please draw the boundary manually below."
+                "No boundary polygon was found. "
+                "Please draw the boundary manually below."
             )
+
     st.subheader("Draw the forest boundary")
 
     st.write(
@@ -499,13 +511,14 @@ if page == pages[0]:
         "The drawn outline will be used for grid generation."
     )
 
-        draw_map = folium.Map(
+    draw_map = folium.Map(
         location=st.session_state.center,
         zoom_start=10,
         tiles="OpenStreetMap",
         control_scale=True,
     )
 
+    # Display the fetched boundary on the drawing map
     if st.session_state.boundary:
         folium.GeoJson(
             {
@@ -525,6 +538,7 @@ if page == pages[0]:
             },
         ).add_to(draw_map)
 
+    # Keep the manual drawing tools available
     Draw(
         export=True,
         draw_options={
@@ -547,6 +561,7 @@ if page == pages[0]:
         use_container_width=True,
         key="boundary_draw",
     )
+
     if result and result.get("last_active_drawing"):
         geometry = result["last_active_drawing"].get("geometry")
 
@@ -559,6 +574,7 @@ if page == pages[0]:
             st.success(
                 "Forest boundary captured for this session."
             )
+
 
 
 # --------------------------------------------------
