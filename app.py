@@ -483,7 +483,21 @@ if page == pages[0]:
         "Forest names are starting examples. Verify boundaries "
         "before using results for real-world decisions."
     )
+    if st.button(
+        "Fetch forest boundary",
+        type="secondary",
+        key="fetch_forest_boundary_button",
+    ):
+        with st.spinner("Searching OpenStreetMap for the forest boundary..."):
+            geometry = fetch_forest_boundary(st.session_state.forest)
 
+        if geometry:
+            st.session_state.boundary = geometry
+            st.success("Forest boundary fetched successfully!")
+        else:
+            st.warning(
+                "No boundary polygon was found. Please draw the boundary manually below."
+            )
     st.subheader("Draw the forest boundary")
 
     st.write(
