@@ -499,13 +499,14 @@ if page == pages[0]:
         "The drawn outline will be used for grid generation."
     )
 
-    draw_map = folium.Map(
+        draw_map = folium.Map(
         location=st.session_state.center,
         zoom_start=10,
         tiles="OpenStreetMap",
         control_scale=True,
     )
-        if st.session_state.boundary:
+
+    if st.session_state.boundary:
         folium.GeoJson(
             {
                 "type": "Feature",
@@ -546,7 +547,6 @@ if page == pages[0]:
         use_container_width=True,
         key="boundary_draw",
     )
-
     if result and result.get("last_active_drawing"):
         geometry = result["last_active_drawing"].get("geometry")
 
