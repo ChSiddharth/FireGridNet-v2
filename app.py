@@ -145,6 +145,10 @@ COLORS = {
 # 6. FETCH WEATHER DATA
 # --------------------------------------------------
 
+# --------------------------------------------------
+# 6. FETCH WEATHER DATA AND FOREST BOUNDARY
+# --------------------------------------------------
+
 def get_weather(lat, lon):
     response = requests.get(
         "https://api.open-meteo.com/v1/forecast",
@@ -161,16 +165,12 @@ def get_weather(lat, lon):
     )
 
     response.raise_for_status()
-
     return response.json()["current"]
-
-def get_weather(lat, lon):
-    # Keep your existing get_weather function here
-    # Do not replace its code
 
 
 def fetch_forest_boundary(forest_name):
     """Fetch a forest boundary from OpenStreetMap's Nominatim service."""
+
     url = "https://nominatim.openstreetmap.org/search"
 
     params = {
@@ -209,12 +209,6 @@ def fetch_forest_boundary(forest_name):
 
     except requests.RequestException:
         return None
-
-
-def inside_polygon(point, polygon):
-    # Keep your existing inside_polygon function here
-    # Do not replace its code
-
 
 
 # --------------------------------------------------
