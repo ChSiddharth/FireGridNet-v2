@@ -421,7 +421,7 @@ if page == pages[0]:
             st.success(f"Selected forest: {selected}")
 
 
-        if st.button("Open forest", type="primary"):
+        if st.button("Open forest", type="primary", key="open_forest_button"):
             st.session_state.forest = selected
             st.session_state.center = list(FORESTS[selected])
             st.session_state.boundary = None
