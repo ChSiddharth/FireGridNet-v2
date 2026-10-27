@@ -9,6 +9,84 @@ import requests
 import streamlit as st
 from folium.plugins import Draw
 from streamlit_folium import st_folium
+from shapely.geometry import shape, box, mapping
+
+def generate_forest_grid(boundary_geojson, cell_size_km=1.0):
+    """
+    Generate grid cells clipped to a supplied forest boundary.
+
+    boundary_geojson must contain a GeoJSON Polygon or MultiPolygon
+    geometry in longitude, latitude order.
+    """
+    from math import cos, radians
+
+    if cell_size_km <= 0:
+        raise ValueError("Grid size must be greater than zero.")
+
+    # Accept either a geometry or a GeoJSON Feature.
+    if boundary_geojson.get("type") == "Feature":
+        boundary_geojson = boundary_geojson.get("geometry")
+
+    if not boundary_geojson:
+        raise ValueError("A valid forest boundary is required.")
+
+    boundary = shape(boundary_geojson)
+
+    if boundary.is_empty or not boundary.is_valid:
+        raise ValueError("The forest boundary is empty or invalid.")
+
+    if boundary.geom_type not in ("Polygon", "MultiPolygon"):
+        raise ValueError("Boundary must be a Polygon or MultiPolygon.")
+
+    min_lon, min_lat, max_lon, max_lat = boundary.bounds
+    center_lat = (min_lat + max_lat) / 2
+
+    # Approximate degree spacing for the requested kilometre size.
+    lat_step = cell_size_km / 111.32
+    lon_step = cell_size_km / (
+        111.32 * max(abs(cos(radians(center_lat))), 0.01)
+    )
+
+    features = []
+    row = 0
+    lat = min_lat
+
+    while lat < max_lat:
+        col = 0
+        lon = min_lon
+
+        while lon < max_lon:
+            cell = box(
+                lon,
+                lat,
+                min(lon + lon_step, max_lon),
+                min(lat + lat_step, max_lat),
+            )
+
+            clipped_cell = cell.intersection(boundary)
+
+            if not clipped_cell.is_empty and clipped_cell.area > 0:
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "cell_id": f"GRID-{row:04d}-{col:04d}",
+                        "grid_size_km": cell_size_km,
+                    },
+                    "geometry": mapping(clipped_cell),
+                })
+
+            lon += lon_step
+            col += 1
+
+        lat += lat_step
+        row += 1
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
 
 st.set_page_config(
     page_title="FireGridNet",
