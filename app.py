@@ -1,8 +1,8 @@
+import json
 import os
 import math
 import tempfile
 from datetime import datetime
-
 import folium
 import pandas as pd
 import requests
@@ -129,6 +129,8 @@ FORESTS = {
 
 if "forest" not in st.session_state:
     st.session_state.forest = "Jim Corbett National Park"
+if "grid_geojson" not in st.session_state:
+    st.session_state.grid_geojson = None
 if "center" not in st.session_state:
     st.session_state.center = list(FORESTS[st.session_state.forest])
 if "boundary" not in st.session_state:
@@ -208,121 +210,56 @@ def inside_polygon(lon, lat, ring):
 
     return inside
 
-def generate_grid(center, boundary, rows, cols):
-    lat, lon = center
 
-    lat_span = 0.12
-    lon_span = lat_span / max(math.cos(math.radians(lat)), 0.25)
-
-    min_lat = lat - lat_span / 2
-    max_lat = lat + lat_span / 2
-    min_lon = lon - lon_span / 2
-    max_lon = lon + lon_span / 2
-
-    ring = None
-    if boundary and boundary.get("type") == "Polygon":
-        ring = boundary["coordinates"][0]
-    elif boundary and boundary.get("type") == "MultiPolygon":
-        ring = boundary["coordinates"][0][0]
-
-    records = []
-
-    for r in range(rows):
-        for c in range(cols):
-            cell_lat = min_lat + (r + 0.5) * lat_span / rows
-            cell_lon = min_lon + (c + 0.5) * lon_span / cols
-
-            if ring and not inside_polygon(cell_lon, cell_lat, ring):
-                continue
-
-            records.append({
-                "Grid ID": f"{chr(65+r)}{c+1:02d}",
-                "Latitude": round(cell_lat, 5),
-                "Longitude": round(cell_lon, 5),
-                "Temperature °C": None,
-                "Humidity %": None,
-                "Rain mm": None,
-                "Wind km/h": None,
-                "Risk Score": None,
-                "Risk Level": "Not assessed",
-            })
-
-    return pd.DataFrame(records)
 
 def build_map(global_view=False, with_grid=False):
     if global_view:
         m = folium.Map(
             location=[20, 0],
             zoom_start=2,
-            tiles="OpenStreetMap",
-            control_scale=True,
+            tiles="OpenStreetMap"
         )
-        folium.Marker(
-            [20.59, 78.96],
-            tooltip="India · Initial study region",
-            icon=folium.Icon(color="green", icon="leaf"),
-        ).add_to(m)
+    else:
+        center = st.session_state.center
+        m = folium.Map(
+            location=center,
+            zoom_start=6,
+            tiles="OpenStreetMap"
+        )
 
-        for name, coords in FORESTS.items():
-            folium.CircleMarker(
-                coords, radius=5, tooltip=name,
-                color="#35df88", fill=True, fill_opacity=0.9,
-            ).add_to(m)
+    # Draw the selected forest boundary
+    boundary = st.session_state.get("boundary")
 
-        return m
-
-    lat, lon = st.session_state.center
-    m = folium.Map(
-        location=[lat, lon],
-        zoom_start=10,
-        tiles="OpenStreetMap",
-        control_scale=True,
-    )
-
-    boundary = st.session_state.boundary
     if boundary:
         folium.GeoJson(
-            {"type": "Feature",
-             "properties": {"name": st.session_state.forest},
-             "geometry": boundary},
-            name="Forest boundary",
-            tooltip=st.session_state.forest,
-            style_function=lambda _: {
-                "color": "#35f58a",
+            boundary,
+            name="Forest Boundary",
+            style_function=lambda feature: {
+                "color": "#00A86B",
                 "weight": 3,
-                "fillColor": "#16834b",
-                "fillOpacity": 0.12,
-            },
+                "fillColor": "#00A86B",
+                "fillOpacity": 0.08
+            }
         ).add_to(m)
 
-    if with_grid and not st.session_state.grid.empty:
-        df = st.session_state.grid
-        rows = st.session_state.grid_rows
-        cols = st.session_state.grid_cols
-        lat_span = 0.12
-        lon_span = lat_span / max(math.cos(math.radians(lat)), 0.25)
-        cell_lat = lat_span / rows
-        cell_lon = lon_span / cols
+    # Draw the real clipped grid cells
+    grid_geojson = st.session_state.get("grid_geojson")
 
-        for _, cell in df.iterrows():
-            color = COLORS.get(cell["Risk Level"], COLORS["Not assessed"])
-            clat, clon = cell["Latitude"], cell["Longitude"]
-
-            folium.Rectangle(
-                bounds=[
-                    [clat - cell_lat/2, clon - cell_lon/2],
-                    [clat + cell_lat/2, clon + cell_lon/2],
-                ],
-                color=color,
-                weight=1,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.65,
-                tooltip=(
-                    f'{cell["Grid ID"]} · {cell["Risk Level"]} · '
-                    f'{cell["Risk Score"]}'
-                ),
-            ).add_to(m)
+    if with_grid and grid_geojson:
+        folium.GeoJson(
+            grid_geojson,
+            name="Forest Grid",
+            style_function=lambda feature: {
+                "color": "#1565C0",
+                "weight": 1,
+                "fillColor": "#42A5F5",
+                "fillOpacity": 0.25
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["cell_id", "grid_size_km"],
+                aliases=["Grid ID:", "Cell size (km):"]
+            )
+        ).add_to(m)
 
     folium.LayerControl().add_to(m)
     return m
@@ -393,122 +330,114 @@ if page == pages[0]:
             st.session_state.boundary = geometry
             st.success("Forest boundary captured for this session.")
 
+
 elif page == pages[1]:
     st.subheader("Forest Grid Generation")
-    
-st.subheader("🌲 Load Forest Boundary")
 
-boundary_file = st.file_uploader(
-    "Upload forest boundary (GeoJSON)",
-    type=["geojson", "json"],
-    key="forest_boundary_upload",
-)
+    st.subheader("🌲 Load Forest Boundary")
 
-cell_size_km = st.number_input(
-    "Grid cell size (km)",
-    min_value=0.5,
-    max_value=10.0,
-    value=1.0,
-    step=0.5,
-)
-
-if boundary_file is not None:
-    try:
-        boundary_geojson = json.load(boundary_file)
-
-        if boundary_geojson.get("type") == "FeatureCollection":
-            features = boundary_geojson.get("features", [])
-
-            if len(features) != 1:
-                st.warning(
-                    "Please upload a GeoJSON containing one forest boundary."
-                )
-            else:
-                boundary_geojson = features[0]
-
-                if st.button("Generate Forest Grid", type="primary"):
-                    grid_data = generate_forest_grid(
-                        boundary_geojson,
-                        cell_size_km=cell_size_km,
-                    )
-
-                    st.session_state["generated_forest_grid"] = grid_data
-
-                    st.success(
-                        f"Generated {len(grid_data['features'])} grid cells."
-                    )
-
-        elif boundary_geojson.get("type") == "Feature":
-            if st.button("Generate Forest Grid", type="primary"):
-                grid_data = generate_forest_grid(
-                    boundary_geojson,
-                    cell_size_km=cell_size_km,
-                )
-
-                st.session_state["generated_forest_grid"] = grid_data
-
-                st.success(
-                    f"Generated {len(grid_data['features'])} grid cells."
-                )
-
-        else:
-            st.error(
-                "Upload a GeoJSON Feature or a FeatureCollection "
-                "containing one forest boundary."
-            )
-
-    except Exception as e:
-        st.error(f"Could not process boundary: {e}")
-
-
-    selected = st.selectbox(
-        "Forest",
-        list(FORESTS),
-        index=list(FORESTS).index(st.session_state.forest),
+    boundary_file = st.file_uploader(
+        "Upload forest boundary (GeoJSON)",
+        type=["geojson", "json"],
+        key="forest_boundary_upload",
     )
-    if selected != st.session_state.forest:
-        st.session_state.forest = selected
-        st.session_state.center = list(FORESTS[selected])
-        st.session_state.boundary = None
-        st.session_state.grid = pd.DataFrame()
 
-    a, b = st.columns(2)
-    with a:
-        rows = st.slider("Grid rows", 4, 16, 8)
-    with b:
-        cols = st.slider("Grid columns", 4, 16, 8)
+    cell_size_km = st.number_input(
+        "Grid cell size (km)",
+        min_value=0.5,
+        max_value=10.0,
+        value=1.0,
+        step=0.5,
+    )
 
-    if not st.session_state.boundary:
-        st.warning(
-            "Draw the forest boundary in Module 1 first. "
-            "Without a boundary, cells cover only an approximate study area."
+    if boundary_file is not None:
+        try:
+            uploaded_data = json.load(boundary_file)
+
+            if uploaded_data.get("type") == "FeatureCollection":
+                features = uploaded_data.get("features", [])
+                if len(features) != 1:
+                    st.error(
+                        "Please upload a GeoJSON containing exactly one forest boundary."
+                    )
+                    uploaded_data = None
+                else:
+                    uploaded_data = features[0]
+
+            if uploaded_data and uploaded_data.get("type") == "Feature":
+                geometry = uploaded_data.get("geometry")
+
+                if geometry:
+                    if st.button("Generate Forest Grid", type="primary"):
+                        grid_data = generate_forest_grid(
+                            geometry,
+                            cell_size_km=cell_size_km,
+                        )
+
+                        st.session_state.grid_geojson = grid_data
+                        st.session_state.boundary = geometry
+
+                        boundary_shape = shape(geometry)
+                        centroid = boundary_shape.centroid
+                        st.session_state.center = [
+                            centroid.y,
+                            centroid.x,
+                        ]
+
+                        cells = []
+                        for feature in grid_data["features"]:
+                            cell_shape = shape(feature["geometry"])
+                            point = cell_shape.centroid
+
+                            cells.append({
+                                "Grid ID": feature["properties"]["cell_id"],
+                                "Latitude": point.y,
+                                "Longitude": point.x,
+                                "Grid Size (km)": cell_size_km,
+                            })
+
+                        st.session_state.grid = pd.DataFrame(cells)
+
+                        st.success(
+                            f"Generated {len(cells)} grid cells."
+                        )
+                else:
+                    st.error("The GeoJSON feature has no geometry.")
+
+            elif uploaded_data and uploaded_data.get("type") != "Feature":
+                st.error(
+                    "Upload a GeoJSON Feature or a FeatureCollection "
+                    "containing exactly one forest boundary."
+                )
+
+        except Exception as e:
+            st.error(f"Could not process boundary: {e}")
+
+    if st.session_state.grid_geojson:
+        st.metric(
+            "Grid cells",
+            len(st.session_state.grid_geojson["features"]),
         )
 
-    if st.button("Generate grid", type="primary"):
-        st.session_state.grid_rows = rows
-        st.session_state.grid_cols = cols
-        st.session_state.grid = generate_grid(
-            st.session_state.center,
-            st.session_state.boundary,
-            rows,
-            cols,
-        )
-
-    if not st.session_state.grid.empty:
-        st.metric("Grid cells", len(st.session_state.grid))
         st_folium(
             build_map(with_grid=True),
             height=500,
             use_container_width=True,
             key="grid_display",
         )
-        st.dataframe(st.session_state.grid, use_container_width=True)
+
+        st.dataframe(
+            st.session_state.grid,
+            use_container_width=True,
+        )
+
         st.download_button(
             "Download grid CSV",
             st.session_state.grid.to_csv(index=False),
             "firegridnet_grid.csv",
             "text/csv",
         )
+
 
 elif page == pages[2]:
     st.subheader("Weather & Grid Risk")
