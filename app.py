@@ -505,6 +505,24 @@ if page == pages[0]:
         tiles="OpenStreetMap",
         control_scale=True,
     )
+        if st.session_state.boundary:
+        folium.GeoJson(
+            {
+                "type": "Feature",
+                "properties": {
+                    "name": st.session_state.forest
+                },
+                "geometry": st.session_state.boundary,
+            },
+            name="Fetched forest boundary",
+            tooltip=st.session_state.forest,
+            style_function=lambda _: {
+                "color": "#35f58a",
+                "weight": 3,
+                "fillColor": "#16834b",
+                "fillOpacity": 0.15,
+            },
+        ).add_to(draw_map)
 
     Draw(
         export=True,
