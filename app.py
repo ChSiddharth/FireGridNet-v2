@@ -665,7 +665,11 @@ if page == pages[0]:
         selected = st.selectbox(
             "Select an Indian forest",
             forest_names,
-            index=forest_names.index(st.session_state.forest),
+            index=(
+    forest_names.index(st.session_state.forest)
+    if st.session_state.forest in forest_names
+    else 0
+),
             key="forest_selector",
         )
 
