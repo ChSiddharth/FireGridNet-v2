@@ -197,7 +197,7 @@ def build_map(global_view=False, with_grid=False):
     m = folium.Map(
         location=[lat, lon],
         zoom_start=10,
-        tiles="CartoDB dark_matter",
+        tiles="OpenStreetMap",
         control_scale=True,
     )
 
