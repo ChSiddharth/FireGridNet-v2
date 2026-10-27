@@ -169,10 +169,11 @@ def get_weather(lat, lon):
 
 
 
-def fetch_forest_boundary(forest_name):
-    """Try multiple OpenStreetMap search names for a forest polygon."""
 
-    search_names = {
+def fetch_forest_boundary(forest_name):
+    """Find a forest polygon using Nominatim and Overpass."""
+
+    forest_queries = {
         "Jim Corbett National Park": [
             "Jim Corbett National Park, Uttarakhand, India",
             "Corbett National Park, India",
@@ -188,7 +189,6 @@ def fetch_forest_boundary(forest_name):
         "Kanha National Park": [
             "Kanha National Park, Madhya Pradesh, India",
             "Kanha Tiger Reserve, Madhya Pradesh, India",
-            "Kanha National Park, India",
         ],
         "Sundarbans National Park": [
             "Sundarban National Park, West Bengal, India",
@@ -197,59 +197,107 @@ def fetch_forest_boundary(forest_name):
         ],
     }
 
-    queries = search_names.get(
-        forest_name,
-        [f"{forest_name}, India"],
-    )
-
-    url = "https://nominatim.openstreetmap.org/search"
-
     headers = {
-        "User-Agent": "FireGridNet/1.0 (student wildfire research project)"
+        "User-Agent": "FireGridNet/1.0 (student research project)"
     }
 
-    for query in queries:
+    # SOURCE 1: Nominatim search
+    for query in forest_queries.get(
+        forest_name, [f"{forest_name}, India"]
+    ):
         try:
             response = requests.get(
-                url,
+                "https://nominatim.openstreetmap.org/search",
                 params={
                     "q": query,
                     "format": "jsonv2",
                     "polygon_geojson": 1,
-                    "limit": 10,
+                    "limit": 5,
                     "countrycodes": "in",
                 },
                 headers=headers,
                 timeout=25,
             )
-
             response.raise_for_status()
-            results = response.json()
 
-            # Check every returned result, not just the first one
-            for item in results:
+            for item in response.json():
                 geometry = item.get("geojson")
 
-                if not isinstance(geometry, dict):
-                    continue
-
-                geometry_type = geometry.get("type")
-                coordinates = geometry.get("coordinates")
-
                 if (
-                    geometry_type in ("Polygon", "MultiPolygon")
-                    and coordinates
+                    isinstance(geometry, dict)
+                    and geometry.get("type")
+                    in ("Polygon", "MultiPolygon")
+                    and geometry.get("coordinates")
                 ):
                     return geometry
 
-        except (
-            requests.RequestException,
-            ValueError,
-            TypeError,
-        ):
+        except (requests.RequestException, ValueError, TypeError):
+            continue
+
+    # SOURCE 2: Overpass API, searching mapped boundary ways
+    search_terms = {
+        "Kanha National Park": ["Kanha"],
+        "Sundarbans National Park": ["Sundarban", "Sundarbans"],
+        "Jim Corbett National Park": ["Corbett"],
+        "Amrabad Tiger Reserve": ["Amrabad"],
+        "Nagarhole National Park": ["Nagarhole", "Rajiv Gandhi"],
+    }
+
+    terms = search_terms.get(forest_name, [forest_name])
+
+    for term in terms:
+        safe_term = term.replace("\\", "\\\\").replace('"', '\\"')
+
+        query = f"""
+        [out:json][timeout:30];
+        (
+          way["name"~"{safe_term}",i]["boundary"~"protected_area|national_park"];
+          way["name"~"{safe_term}",i]["leisure"="nature_reserve"];
+        );
+        out geom;
+        """
+
+        try:
+            response = requests.post(
+                "https://overpass-api.de/api/interpreter",
+                data={"data": query},
+                headers=headers,
+                timeout=40,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            for element in data.get("elements", []):
+                points = element.get("geometry", [])
+
+                # A closed way has the same first and last coordinate.
+                if len(points) < 4:
+                    continue
+
+                first = points[0]
+                last = points[-1]
+
+                if (
+                    first.get("lat") != last.get("lat")
+                    or first.get("lon") != last.get("lon")
+                ):
+                    continue
+
+                ring = [
+                    [point["lon"], point["lat"]]
+                    for point in points
+                ]
+
+                return {
+                    "type": "Polygon",
+                    "coordinates": [ring],
+                }
+
+        except (requests.RequestException, ValueError, TypeError):
             continue
 
     return None
+
 
 
 
