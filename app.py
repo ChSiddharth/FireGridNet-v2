@@ -893,22 +893,38 @@ elif page == pages[2]:
 
         limit = st.slider(
             "Cells to assess",
-            1,
-            len(df),
-            min(16, len(df)),
+            min_value=1,
+            max_value=len(df),
+            value=min(16, len(df)),
+            key="weather_cells_limit",
         )
 
         if st.button(
             "Fetch live weather and assess risk",
             type="primary",
+            key="assess_weather_risk",
         ):
             progress = st.progress(0)
+            status = st.empty()
 
-            for i in range(limit):
+            success_count = 0
+            failed_count = 0
+
+            # Assess the selected number of grid cells
+            for position in range(limit):
+                row_index = df.index[position]
+
                 try:
+                    latitude = float(
+                        df.at[row_index, "Latitude"]
+                    )
+                    longitude = float(
+                        df.at[row_index, "Longitude"]
+                    )
+
                     weather = get_weather(
-                        float(df.loc[i, "Latitude"]),
-                        float(df.loc[i, "Longitude"]),
+                        latitude,
+                        longitude,
                     )
 
                     temp = weather.get("temperature_2m")
@@ -918,6 +934,20 @@ elif page == pages[2]:
                     rain = weather.get("precipitation")
                     wind = weather.get("wind_speed_10m")
 
+                    # Check that all required weather values exist
+                    if any(
+                        value is None
+                        for value in [
+                            temp,
+                            humidity,
+                            rain,
+                            wind,
+                        ]
+                    ):
+                        raise ValueError(
+                            "Weather response is missing values."
+                        )
+
                     score, level = risk_score(
                         temp,
                         humidity,
@@ -925,27 +955,65 @@ elif page == pages[2]:
                         wind,
                     )
 
-                    df.loc[i, "Temperature °C"] = temp
-                    df.loc[i, "Humidity %"] = humidity
-                    df.loc[i, "Rain mm"] = rain
-                    df.loc[i, "Wind km/h"] = wind
-                    df.loc[i, "Risk Score"] = score
-                    df.loc[i, "Risk Level"] = level
+                    df.at[
+                        row_index, "Temperature °C"
+                    ] = temp
 
-                except Exception:
-                    df.loc[i, "Risk Level"] = "No data"
+                    df.at[
+                        row_index, "Humidity %"
+                    ] = humidity
+
+                    df.at[
+                        row_index, "Rain mm"
+                    ] = rain
+
+                    df.at[
+                        row_index, "Wind km/h"
+                    ] = wind
+
+                    df.at[
+                        row_index, "Risk Score"
+                    ] = score
+
+                    df.at[
+                        row_index, "Risk Level"
+                    ] = level
+
+                    success_count += 1
+
+                except Exception as error:
+                    df.at[
+                        row_index, "Risk Level"
+                    ] = "No data"
+
+                    failed_count += 1
+
+                    status.warning(
+                        f'Weather unavailable for '
+                        f'{df.at[row_index, "Grid ID"]}: '
+                        f'{error}'
+                    )
 
                 progress.progress(
-                    (i + 1) / limit
+                    (position + 1) / limit
                 )
 
             st.session_state.grid = df
 
-            st.success(
-                f"Weather checked for {limit} cells."
-            )
+            if success_count:
+                st.success(
+                    f"Weather assessed for {success_count} "
+                    f"of {limit} selected cells."
+                )
 
-        df = st.session_state.grid
+            if failed_count:
+                st.warning(
+                    f"{failed_count} cells could not be assessed. "
+                    "Check the displayed weather errors."
+                )
+
+        # Display the latest grid data
+        df = st.session_state.grid.copy()
 
         assessed = df[df["Risk Score"].notna()]
 
@@ -983,8 +1051,9 @@ elif page == pages[2]:
         )
 
         st.caption(
-            "Risk scores are an experimental heuristic, not an "
-            "official Fire Weather Index or validated wildfire forecast."
+            "Risk scores are experimental heuristic estimates. "
+            "They are not an official Fire Weather Index or a "
+            "validated wildfire forecast."
         )
 
         st.download_button(
@@ -992,7 +1061,9 @@ elif page == pages[2]:
             df.to_csv(index=False),
             "firegridnet_weather_risk.csv",
             "text/csv",
+            key="download_weather_risk",
         )
+
 
 
 # --------------------------------------------------
