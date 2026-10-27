@@ -1,4 +1,3 @@
-
 import os
 import math
 import tempfile
@@ -177,7 +176,7 @@ def build_map(global_view=False, with_grid=False):
         m = folium.Map(
             location=[20, 0],
             zoom_start=2,
-            tiles="CartoDB dark_matter",
+            tiles="OpenStreetMap",
             control_scale=True,
         )
         folium.Marker(
